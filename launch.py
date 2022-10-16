@@ -5,6 +5,8 @@ from AE.model import AE
 from torchvision.utils import save_image
 import numpy as np
 from PIL import Image
+from torchvision.datasets import CelebA
+import os
 
 smile_tensor = torch.tensor([[ 1.2482e+00,  1.3504e+01,  7.2060e+00,  7.0291e-01, -6.1040e+00,
          -6.4269e+00,  1.8476e+00,  9.0406e-01, -2.7211e-01, -5.2865e+00,
@@ -59,10 +61,13 @@ smile_tensor = torch.tensor([[ 1.2482e+00,  1.3504e+01,  7.2060e+00,  7.0291e-01
           3.8815e+00, -2.6446e+00, -1.2733e+00,  9.2129e-01,  1.5513e+00,
          -2.8488e+00]])
 
+if not os.path.exists("./results"):
+    os.mkdir("./results")
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 model_AE = AE(256).to(device)
-model_AE.load_state_dict(torch.load(".\weights\AE.pth"))
+model_AE.load_state_dict(torch.load("./weights/AE.pth", map_location=torch.device(device)))
 
 transforms = transform.Compose([
     transform.CenterCrop(128),
@@ -76,26 +81,27 @@ def rebuild_image(img, random_celeba, smile_vector):
     global count
 
     if random_celeba:
-        img = Image.open(f".\data\celeba\img_align_celeba\{np.random.randint(1, 202599):06d}.jpg")
+        if not os.path.exists("./data/celeba/img_align_celeba"):
+            CelebA("./data", download=True, transform=transforms)
+
+        img = Image.open(f"./data/celeba/img_align_celeba/{np.random.randint(1, 202599):06d}.jpg")
 
     count += 1
     img = transforms(img).unsqueeze(0).to(device)
     latent_space = model_AE.encode(img)
 
-
+    if not os.path.exists("./results/AE"):
+        os.mkdir("./results/AE")
 
     if smile_vector:
         reconstruct = model_AE.decode(latent_space + smile_tensor.to(device))
     else:
         reconstruct = model_AE.decode(latent_space)
 
+    save_image(reconstruct[0], f"./results/AE/test{count}.png")
 
+    return f"./results/AE/test{count}.png"
 
-    save_image(reconstruct[0], f"./results/test{count}.png")
-
-    return f"./results/test{count}.png"
-
-import matplotlib.pyplot as plt
 AE_Inteface = gr.Interface(fn=rebuild_image, 
              inputs=[gr.Image(type="pil", label="image"), 
              gr.Checkbox(["random_celeba"], label="Random Celeba Face (will replace pasted image)"),

@@ -59,5 +59,6 @@ class AE(nn.Module):
         return self.decoder(x)
 
 
-model = AE(256).to("cuda")
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model = AE(256).to(device)
 print(summary(model, (3, 128, 128)))
